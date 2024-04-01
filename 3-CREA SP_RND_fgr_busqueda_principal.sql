@@ -1,3 +1,10 @@
+USE [RNDetenciones]
+GO
+/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 22/03/2024 11:49:31 a. m. ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 -- =============================================
 -- Author:      JLCR  
 -- Create date: 28 Enero 2024
@@ -5,13 +12,14 @@
 -- Description:	Consulta informacion HPD y FA
 -- =============================================
 
-CREATE PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
+alter PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
 ( @Nun_expdiente      varchar(70) = ''
 , @Cta_usuario        varchar(70) = ''
 , @Nombre_usuario     varchar(70) = ''
 , @Nombre             varchar(70) = ''
 , @paterno            varchar(70) = ''
 , @materno            varchar(50) = ''
+, @curp               varchar(30) = ''
 , @alias              varchar(13) = ''
 , @idedo              int = 0
 , @idmpio             int = 0
@@ -71,17 +79,21 @@ BEGIN
             , isnull(d.numero_exterior,'''') numero_exterior
             , isnull(d.codigo_postal,'''') codigo_postal
             , isnull(d.referencias,'''') referencias
-            , CONVERT(DATE,d.fecha_detencion) fecha_detencion
+           
+		    , CONVERT(DATE,d.fecha_detencion) fecha_detencion
             , isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento)) fecha_nacimiento
            -- , convert(nvarchar, datepart(hour,d.fecha_detencion)) + '':'' + convert(nvarchar,datepart(minute,d.fecha_detencion)) hora_detencion
             , isnull(substring(convert(nvarchar, d.fecha_detencion,108), 1, 5),'''') hora_detencion
-            , DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as Edad
+            , DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as edad
             , CASE WHEN STUFF((SELECT '','' + ci.institucion FROM oficiales o INNER JOIN cat_instituciones ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
 			ELSE STUFF((SELECT '','' + ci.institucion FROM oficiales o INNER JOIN cat_instituciones ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') END  + '','' +
 			CASE WHEN STUFF((SELECT '','' + institucion FROM oficiales_PSP opsp WHERE opsp.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
 			ELSE STUFF((SELECT '','' + institucion FROM oficiales_PSP opsp WHERE opsp.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') END AS autoridad_detiene,
-			isnull(pd.adscripcion_recibe,'''') as autoridad_recibe, isnull(pd.fecha_recibe,'''') fecha_recibe, isnull(ddc.carpeta_investigacion,'''') carpeta_investigacion
-            , CONVERT(DATE,GETDATE()) fecha_consulta, dt.alias +'',''+ CASE WHEN STUFF((SELECT '','' + alias FROM alias_detenido ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') IS NULL THEN '''' 
+			isnull(pd.adscripcion_recibe,'''') as autoridad_recibe
+			, isnull(pd.fecha_recibe,'''') fecha_recibe
+			, isnull(ddc.carpeta_investigacion,'''') carpeta_investigacion
+            , CONVERT(DATE,GETDATE()) fecha_consulta
+			, dt.alias + '','' + DDC.alias + '','' + CASE WHEN STUFF((SELECT '','' + alias FROM alias_detenido ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') IS NULL THEN '''' 
 			ELSE STUFF((SELECT '','' + alias FROM alias_detenido ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') END as alias
             into ##reghpd
             FROM detenciones d
@@ -112,18 +124,18 @@ BEGIN
                 ON ctr.id_tipo_traslado = tr.id_tipo_traslado
             LEFT JOIN alias_detenido dta
                 ON dta.id_detenido_complemento = ddc.id_detenido_complemento
-            INNER JOIN geodirecciones..entidad CE 
+            LEFT JOIN geodirecciones..entidad CE 
                 ON CE.identidad = D.id_entidad
-            INNER JOIN geodirecciones..municipio CM 
+            LEFT JOIN geodirecciones..municipio CM 
                 ON CM.identidad = D.id_entidad 
                 AND CM.idmpio = D.id_municipio
             LEFT JOIN GeoDirecciones.DBO.LOCALIDAD cl 
                 ON cl.IDLOC= d.id_localidad 
                 AND cl.IDMPIO= cm.IDMPIO 
                 AND cl.IDENTIDAD= ce.IDENTIDAD
-            INNER JOIN cat_paises p 
+            LEFT JOIN cat_paises p 
                 ON p.id_pais=ddc.id_pais
-            INNER JOIN cat_nacionalidades n 
+            LEFT JOIN cat_nacionalidades n 
                 ON n.id_nacionalidad=ddc.id_nacionalidad';
 
 	----lectura de FA
@@ -149,7 +161,8 @@ BEGIN
             , isnull(d.codigo_postal,'''') codigo_postal
             , isnull(d.referencias,'''') referencias
             , CONVERT(DATE,d.fecha_detencion) fecha_detencion
-            , isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento)) fecha_nacimiento
+            , isnull(CONVERT(DATE,ddc.fecha_nacimiento)
+			, CONVERT(DATE,dt.fecha_nacimiento)) fecha_nacimiento
            -- , convert(nvarchar, datepart(hour,d.fecha_detencion)) + '':'' + convert(nvarchar,datepart(minute,d.fecha_detencion)) hora_detencion
             , isnull(substring(convert(nvarchar, d.fecha_detencion,108), 1, 5),'''') hora_detencion
             , DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as Edad
@@ -157,10 +170,13 @@ BEGIN
 			ELSE STUFF((SELECT '','' + ci.institucion FROM RNDetenciones_FA.dbo.oficiales_fa o INNER JOIN RNDetenciones_FA.dbo.cat_instituciones_fa ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') END  + '','' +
 			CASE WHEN STUFF((SELECT '','' + institucion FROM RNDetenciones_FA.dbo.oficiales_PSP_fa opsp WHERE opsp.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
 			ELSE STUFF((SELECT '','' + institucion FROM RNDetenciones_FA.dbo.oficiales_PSP_fa opsp WHERE opsp.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') END AS autoridad_detiene,
-			isnull(pd.adscripcion_recibe,'''')  as autoridad_recibe, isnull(pd.fecha_recibe,'''') fecha_recibe, isnull(ddc.carpeta_investigacion,'''') carpeta_investigacion
-            , CONVERT(DATE,GETDATE()) fecha_consulta, dt.alias +'',''+ CASE WHEN STUFF((SELECT '','' + alias FROM RNDetenciones_FA.dbo.alias_detenido_fa ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') IS NULL THEN '''' 
+			isnull(pd.adscripcion_recibe,'''')  as autoridad_recibe
+			, isnull(pd.fecha_recibe,'''') fecha_recibe
+			, isnull(ddc.carpeta_investigacion,'''') carpeta_investigacion
+            , CONVERT(DATE,GETDATE()) fecha_consulta
+			, DT.alias + '','' + DDC.alias + '','' + CASE WHEN STUFF((SELECT '','' + alias FROM RNDetenciones_FA.dbo.alias_detenido_fa ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') IS NULL THEN '''' 
 			ELSE STUFF((SELECT '','' + alias FROM RNDetenciones_FA.dbo.alias_detenido_fa ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') END as alias
-		            into ##regfa
+		    into ##regfa
             FROM RNDetenciones_FA..detenciones_fa d
             INNER JOIN RNDetenciones_FA..cat_tipos_detenciones_fa ctd
                 ON ctd.id_tipo_detencion = D.id_tipo_detencion
@@ -189,18 +205,18 @@ BEGIN
                 ON ctr.id_tipo_traslado = tr.id_tipo_traslado
             LEFT JOIN RNDetenciones_FA..alias_detenido_fa dta
                 ON dta.id_detenido_complemento = ddc.id_detenido_complemento
-            INNER JOIN geodirecciones..entidad CE 
+            LEFT JOIN geodirecciones..entidad CE 
                 ON CE.identidad = D.id_entidad
-            INNER JOIN geodirecciones..municipio CM 
+            LEFT JOIN geodirecciones..municipio CM 
                 ON CM.identidad = D.id_entidad 
                 AND CM.idmpio = D.id_municipio
             LEFT JOIN GeoDirecciones.DBO.LOCALIDAD cl 
                 ON cl.IDLOC= d.id_localidad 
                 AND cl.IDMPIO= cm.IDMPIO 
                 AND cl.IDENTIDAD= ce.IDENTIDAD
-            INNER JOIN RNDetenciones_FA.dbo.cat_paises_fa p 
+            LEFT JOIN RNDetenciones_FA.dbo.cat_paises_fa p 
                 ON p.id_pais=ddc.id_pais
-            INNER JOIN RNDetenciones_FA.dbo.cat_nacionalidades_fa n 
+            LEFT JOIN RNDetenciones_FA.dbo.cat_nacionalidades_fa n 
                 ON n.id_nacionalidad=ddc.id_nacionalidad';
 
         ---formacion de la instruccion WHERE
@@ -212,14 +228,30 @@ BEGIN
              
              SET @vcnombrecompleto = @Nombre + ' ' + @paterno + ' ' + @materno
                    
-             SET @sSQLWhere = @sSQLWhere + ' case ' +
+             /*SET @sSQLWhere = @sSQLWhere + ' case ' +
                         'when dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) is null ' +
                             'then dbo.fn_limpiaCaracteres(dt.nombre + '' '' + dt.apellido_paterno + '' '' + dt.apellido_materno) ' +
                           'when dbo.fn_limpiaCaracteres(dt.nombre + '' '' + dt.apellido_paterno + '' '' + dt.apellido_materno) is null ' +
                             'then dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) ' +
-                     	  'else dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) end like ' + '''%' + rtrim(ltrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto))) + '%'''
-            
+                     	  'else dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) end like ' + '''%' + rtrim(ltrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto))) + '%'''*/
+
+               SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido))) + '' '' + lower(ltrim(rtrim(ddc.apellido_paterno))) + '' '' + lower(ltrim(rtrim(ddc.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%'''
+						+ ' OR dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.nombre))) + '' '' + lower(ltrim(rtrim(dt.apellido_paterno))) + '' '' + lower(ltrim(rtrim(dt.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%''' + ')'
         END
+
+
+            --busquedas con CURP
+            IF @curp <> ''
+              BEGIN
+
+                IF (@sSQLWhere = '')
+
+                    SET @sSQLWhere = @sSQLWhere + ' ddc.CURP like ' + '''%' + ltrim(@curp) + '%'''
+
+                ELSE
+                   SET @sSQLWhere = @sSQLWhere + ' AND ddc.CURP like ' + '''%' + ltrim(@curp) + '%'''
+
+              END
 
             --busquedas con alias
             IF @alias <> ''
@@ -227,10 +259,16 @@ BEGIN
 
                 IF (@sSQLWhere = '')
 
-                    SET @sSQLWhere = @sSQLWhere + ' dta.alias like ' + '''%' + ltrim(@alias) + '%'''
+                    SET @sSQLWhere = @sSQLWhere + ' (DT.ALIAS LIKE ' + '''%' + ltrim(@alias) + '%''' 
+												+ ' OR DDC.ALIAS LIKE ' + '''%' + ltrim(@alias) + '%''' 
+												+ ' OR DTA.ALIAS LIKE ' + '''%'	+ ltrim(@alias) + '%''' 
+												+ ')'
 
                 ELSE
-                   SET @sSQLWhere = @sSQLWhere + ' AND dta.alias like ' + '''%' + ltrim(@alias) + '%'''
+                   SET @sSQLWhere = @sSQLWhere + ' AND (DT.ALIAS LIKE ' + '''%' + ltrim(@alias) + '%''' 
+												+ ' OR DDC.ALIAS LIKE ' + '''%' + ltrim(@alias) + '%''' 
+												+ ' OR DTA.ALIAS LIKE ' + '''%'	+ ltrim(@alias) + '%''' 
+												+ ')' 
 
               END
 
@@ -274,7 +312,7 @@ BEGIN
 
               END
 
-            --busquedas por clave de sexo
+--busquedas por clave de sexo
 			IF  @sexo IN ('H','M','X')
               BEGIN
 
@@ -287,22 +325,13 @@ BEGIN
 						SET @sSQLWhere = @sSQLWhere + ' case
 							when ddc.id_sexo is null
 								then dt.id_sexo
-							when dt.id_sexo is null
-								then ddc.id_sexo
-							else ddc.id_sexo end = ' + @cvsexo 
-							+ ' OR case
-							when ddc.id_sexo is null
-								then dt.id_sexo
-							when dt.id_sexo is null
-								then ddc.id_sexo
-							else ddc.id_sexo end = 1'
+							else ddc.id_sexo end in ( ' + @cvsexo + ', 1 )'
+
 					ELSE
 						SET @sSQLWhere = @sSQLWhere + ' case
 							when ddc.id_sexo is null
 								then dt.id_sexo
-							when dt.id_sexo is null
-								then ddc.id_sexo
-							else ddc.id_sexo  end IN (SELECT id_sexo FROM cat_sexo)'
+							else ddc.id_sexo end IN (SELECT id_sexo FROM cat_sexo)'
 
                 ELSE
 
@@ -310,21 +339,11 @@ BEGIN
 					   SET @sSQLWhere = @sSQLWhere + ' AND case
 							when ddc.id_sexo is null
 								then dt.id_sexo
-							when dt.id_sexo is null
-								then ddc.id_sexo
-							else ddc.id_sexo end = ' + @cvsexo
-							+ ' OR case
-							when ddc.id_sexo is null
-								then dt.id_sexo
-							when dt.id_sexo is null
-								then ddc.id_sexo
-							else ddc.id_sexo end = 1'
+							else ddc.id_sexo end in ( ' + @cvsexo + ', 1 )'
 					ELSE
 						SET @sSQLWhere = @sSQLWhere + ' AND case
 							when ddc.id_sexo is null
 								then dt.id_sexo
-							when dt.id_sexo is null
-								then ddc.id_sexo
 							else ddc.id_sexo  end IN (SELECT id_sexo FROM cat_sexo)'
 
               END -- Termina busquedas por clave de sexo
@@ -352,18 +371,41 @@ BEGIN
 
               END
 
-			--busquedas por Folio
-            --IF @Nun_expdiente <> ''
-            --  BEGIN
+			--busquedas edad minima y/o edad maxima
+            IF @edad_minima <> 0 and @edad_maxima <> 0
+              BEGIN
 
-            --    IF (@sSQLWhere = '')
+                IF (@sSQLWhere = '')
 
-            --        SET @sSQLWhere = @sSQLWhere + ' dt.folio_detenido = ' + '''' + @Nun_expdiente + ''''
+                    SET @sSQLWhere = @sSQLWhere + ' DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) >= ' +  cast(@edad_minima as varchar) + 
+												  ' AND DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) <= ' +  cast(@edad_maxima as varchar)
+                ELSE
+                   SET @sSQLWhere = @sSQLWhere + ' AND (DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) >= ' +  cast(@edad_minima as varchar) + 
+												  ' AND DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) <= ' +  cast(@edad_maxima as varchar) + ')'
 
-            --    ELSE
-            --       SET @sSQLWhere = @sSQLWhere + ' AND dt.folio_detenido = ' + '''' + @Nun_expdiente + ''''
+              END
 
-            --  END
+            IF @edad_minima <> 0 and @edad_maxima = 0
+              BEGIN
+
+                IF (@sSQLWhere = '')
+
+                    SET @sSQLWhere = @sSQLWhere + ' DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) >= ' +  cast(@edad_minima as varchar) 
+                ELSE
+                   SET @sSQLWhere = @sSQLWhere + ' AND (DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) >= ' +  cast(@edad_minima as varchar) + ')'
+
+              END
+
+            IF @edad_minima = 0 and @edad_maxima <> 0
+              BEGIN
+
+             IF (@sSQLWhere = '')
+
+                    SET @sSQLWhere = @sSQLWhere + ' DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) <= ' +  cast(@edad_maxima as varchar)
+                ELSE
+                   SET @sSQLWhere = @sSQLWhere + ' AND (DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) <= ' +  cast(@edad_maxima as varchar) + ')'
+
+              END
 
 		----crea la instruccion where
         IF @sSQLWhere <> ''
