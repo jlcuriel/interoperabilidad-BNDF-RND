@@ -10,6 +10,7 @@ GO
 -- Create date: 28 Enero 2024
 -- Proyecto: interoperabilidad BNDF-RND
 -- Description:	Consulta informacion HPD y FA
+-- Modificación: 1ero de Abril del 2024, modificaciones solicitadas por el area QA
 -- =============================================
 
 alter PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
