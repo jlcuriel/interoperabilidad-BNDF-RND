@@ -1,6 +1,6 @@
 USE [RNDetenciones]
 GO
-/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 22/03/2024 11:49:31 a. m. ******/
+/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 03/04/2024 12:52:01 p. m. ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,10 +10,9 @@ GO
 -- Create date: 28 Enero 2024
 -- Proyecto: interoperabilidad BNDF-RND
 -- Description:	Consulta informacion HPD y FA
--- Modificación: 1ero de Abril del 2024, modificaciones solicitadas por el area QA
 -- =============================================
 
-alter PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
+CREATE PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
 ( @Nun_expdiente      varchar(70) = ''
 , @Cta_usuario        varchar(70) = ''
 , @Nombre_usuario     varchar(70) = ''
@@ -96,6 +95,7 @@ BEGIN
             , CONVERT(DATE,GETDATE()) fecha_consulta
 			, dt.alias + '','' + DDC.alias + '','' + CASE WHEN STUFF((SELECT '','' + alias FROM alias_detenido ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') IS NULL THEN '''' 
 			ELSE STUFF((SELECT '','' + alias FROM alias_detenido ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') END as alias
+			, ced.descripcion_estatus_detencion estatus_detenido
             into ##reghpd
             FROM detenciones d
             INNER JOIN cat_tipos_detenciones ctd
@@ -137,7 +137,9 @@ BEGIN
             LEFT JOIN cat_paises p 
                 ON p.id_pais=ddc.id_pais
             LEFT JOIN cat_nacionalidades n 
-                ON n.id_nacionalidad=ddc.id_nacionalidad';
+                ON n.id_nacionalidad=ddc.id_nacionalidad
+			LEFT JOIN cat_estatus_detenciones ced
+				ON ced.id_estatus_detencion = dt.id_estatus_detenido';
 
 	----lectura de FA
 
@@ -177,6 +179,7 @@ BEGIN
             , CONVERT(DATE,GETDATE()) fecha_consulta
 			, DT.alias + '','' + DDC.alias + '','' + CASE WHEN STUFF((SELECT '','' + alias FROM RNDetenciones_FA.dbo.alias_detenido_fa ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') IS NULL THEN '''' 
 			ELSE STUFF((SELECT '','' + alias FROM RNDetenciones_FA.dbo.alias_detenido_fa ad WHERE ad.id_detenido_complemento=ddc.id_detenido_complemento FOR XML PATH('''')), 1, 1, '''') END as alias
+			, ced.descripcion_estatus_detencion estatus_detenido
 		    into ##regfa
             FROM RNDetenciones_FA..detenciones_fa d
             INNER JOIN RNDetenciones_FA..cat_tipos_detenciones_fa ctd
@@ -218,16 +221,20 @@ BEGIN
             LEFT JOIN RNDetenciones_FA.dbo.cat_paises_fa p 
                 ON p.id_pais=ddc.id_pais
             LEFT JOIN RNDetenciones_FA.dbo.cat_nacionalidades_fa n 
-                ON n.id_nacionalidad=ddc.id_nacionalidad';
+                ON n.id_nacionalidad=ddc.id_nacionalidad
+			LEFT JOIN cat_estatus_detenciones ced
+				ON ced.id_estatus_detencion = dt.id_estatus_detenido';
 
         ---formacion de la instruccion WHERE
         IF @Nombre <> '' OR @paterno <> '' OR @materno <> ''
 
         BEGIN
 
-             IF @paterno = '' SET @paterno = '%'
+             --IF @paterno = '' SET @paterno = '%'
+
+			 --IF @materno = '' SET @materno = '%'
              
-             SET @vcnombrecompleto = @Nombre + ' ' + @paterno + ' ' + @materno
+             SET @vcnombrecompleto = @Nombre + '% ' + @paterno + '% ' + @materno + '%'
                    
              /*SET @sSQLWhere = @sSQLWhere + ' case ' +
                         'when dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) is null ' +
@@ -236,9 +243,16 @@ BEGIN
                             'then dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) ' +
                      	  'else dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) end like ' + '''%' + rtrim(ltrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto))) + '%'''*/
 
-               SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido))) + '' '' + lower(ltrim(rtrim(ddc.apellido_paterno))) + '' '' + lower(ltrim(rtrim(ddc.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%'''
-						+ ' OR dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.nombre))) + '' '' + lower(ltrim(rtrim(dt.apellido_paterno))) + '' '' + lower(ltrim(rtrim(dt.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%''' + ')'
-        END
+               /*SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido))) + '' '' + lower(ltrim(rtrim(ddc.apellido_paterno))) + '' '' + lower(ltrim(rtrim(ddc.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%'''
+						+ ' OR dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.nombre))) + '' '' + lower(ltrim(rtrim(dt.apellido_paterno))) + '' '' + lower(ltrim(rtrim(dt.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%''' + ')'*/
+
+               SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido)))) like ' + '''%' + @Nombre + '%'''
+										   + ' AND dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.apellido_paterno)))) like ' + '''%' + @paterno + '%'''
+										   + ' AND dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.apellido_materno)))) like ' + '''%' + @materno + '%''' 
+										   + ' OR dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.nombre)))) like ' + '''%' + @Nombre + '%'''
+										   + ' AND dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.apellido_paterno)))) like ' + '''%' + @paterno + '%'''
+										   + ' AND dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.apellido_materno)))) like ' + '''%' + @materno + '%'')' 
+			END
 
 
             --busquedas con CURP
