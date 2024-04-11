@@ -1,6 +1,6 @@
 USE [RNDetenciones]
 GO
-/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 03/04/2024 12:52:01 p. m. ******/
+/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 11/04/2024 09:26:46 a. m. ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -12,7 +12,7 @@ GO
 -- Description:	Consulta informacion HPD y FA
 -- =============================================
 
-CREATE PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
+ALTER PROCEDURE [dbo].[SP_RND_fgr_busqueda_principal]
 ( @Nun_expdiente      varchar(70) = ''
 , @Cta_usuario        varchar(70) = ''
 , @Nombre_usuario     varchar(70) = ''
@@ -35,9 +35,9 @@ BEGIN
    BEGIN TRY
     SET NOCOUNT ON
 
-    DECLARE @sSQL             varchar(7000)
-    DECLARE @sSQLFA           varchar(7000)
-    DECLARE @sSQLWhere        varchar(7000)
+    DECLARE @sSQL             varchar(max)
+    DECLARE @sSQLFA           varchar(max)
+    DECLARE @sSQLWhere        varchar(max)
     DECLARE @vcnombrecompleto varchar(7000)
     DECLARE @cvsexo           varchar(1)
     DECLARE @vnreg            int = 0
@@ -230,23 +230,10 @@ BEGIN
 
         BEGIN
 
-             --IF @paterno = '' SET @paterno = '%'
-
-			 --IF @materno = '' SET @materno = '%'
              
              SET @vcnombrecompleto = @Nombre + '% ' + @paterno + '% ' + @materno + '%'
                    
-             /*SET @sSQLWhere = @sSQLWhere + ' case ' +
-                        'when dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) is null ' +
-                            'then dbo.fn_limpiaCaracteres(dt.nombre + '' '' + dt.apellido_paterno + '' '' + dt.apellido_materno) ' +
-                          'when dbo.fn_limpiaCaracteres(dt.nombre + '' '' + dt.apellido_paterno + '' '' + dt.apellido_materno) is null ' +
-                            'then dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) ' +
-                     	  'else dbo.fn_limpiaCaracteres(ddc.nombre_detenido + '' '' + ddc.apellido_paterno + '' '' + ddc.apellido_materno) end like ' + '''%' + rtrim(ltrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto))) + '%'''*/
-
-               /*SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido))) + '' '' + lower(ltrim(rtrim(ddc.apellido_paterno))) + '' '' + lower(ltrim(rtrim(ddc.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%'''
-						+ ' OR dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.nombre))) + '' '' + lower(ltrim(rtrim(dt.apellido_paterno))) + '' '' + lower(ltrim(rtrim(dt.apellido_materno)))) like ' + '''%' + lower(ltrim(rtrim(DBO.fn_limpiaCaracteres(@vcnombrecompleto)))) + '%''' + ')'*/
-
-               SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido)))) like ' + '''%' + @Nombre + '%'''
+             SET @sSQLWhere = @sSQLWhere + ' (dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.nombre_detenido)))) like ' + '''%' + @Nombre + '%'''
 										   + ' AND dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.apellido_paterno)))) like ' + '''%' + @paterno + '%'''
 										   + ' AND dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(ddc.apellido_materno)))) like ' + '''%' + @materno + '%''' 
 										   + ' OR dbo.fn_limpiaCaracteres(lower(ltrim(rtrim(dt.nombre)))) like ' + '''%' + @Nombre + '%'''
