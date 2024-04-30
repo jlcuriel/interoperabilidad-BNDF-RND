@@ -1,6 +1,6 @@
 USE [RNDetenciones]
 GO
-/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 11/04/2024 09:26:46 a. m. ******/
+/****** Object:  StoredProcedure [dbo].[SP_RND_fgr_busqueda_principal]    Script Date: 29/04/2024 01:04:24 p. m. ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -84,7 +84,8 @@ BEGIN
             , isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento)) fecha_nacimiento
            -- , convert(nvarchar, datepart(hour,d.fecha_detencion)) + '':'' + convert(nvarchar,datepart(minute,d.fecha_detencion)) hora_detencion
             , isnull(substring(convert(nvarchar, d.fecha_detencion,108), 1, 5),'''') hora_detencion
-            , DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as edad
+			, (((365* year(getdate()))-(365*(year(isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento))))))+ (month(getdate())-month(isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento))))*30 +(day(getdate()) - day(isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento)))))/365  as edad
+            --, DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as edad
             , CASE WHEN STUFF((SELECT '','' + ci.institucion FROM oficiales o INNER JOIN cat_instituciones ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
 			ELSE STUFF((SELECT '','' + ci.institucion FROM oficiales o INNER JOIN cat_instituciones ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') END  + '','' +
 			CASE WHEN STUFF((SELECT '','' + institucion FROM oficiales_PSP opsp WHERE opsp.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
@@ -164,11 +165,11 @@ BEGIN
             , isnull(d.codigo_postal,'''') codigo_postal
             , isnull(d.referencias,'''') referencias
             , CONVERT(DATE,d.fecha_detencion) fecha_detencion
-            , isnull(CONVERT(DATE,ddc.fecha_nacimiento)
-			, CONVERT(DATE,dt.fecha_nacimiento)) fecha_nacimiento
+            , isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento)) fecha_nacimiento
            -- , convert(nvarchar, datepart(hour,d.fecha_detencion)) + '':'' + convert(nvarchar,datepart(minute,d.fecha_detencion)) hora_detencion
             , isnull(substring(convert(nvarchar, d.fecha_detencion,108), 1, 5),'''') hora_detencion
-            , DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as Edad
+			, (((365* year(getdate()))-(365*(year(isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento))))))+ (month(getdate())-month(isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento))))*30 +(day(getdate()) - day(isnull(CONVERT(DATE,ddc.fecha_nacimiento), CONVERT(DATE,dt.fecha_nacimiento)))))/365  as edad
+            --, DATEDIFF(YEAR, isnull(ddc.fecha_nacimiento, dt.fecha_nacimiento), GETDATE()) as Edad
             , CASE WHEN STUFF((SELECT '','' + ci.institucion FROM RNDetenciones_FA.dbo.oficiales_fa o INNER JOIN RNDetenciones_FA.dbo.cat_instituciones_fa ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
 			ELSE STUFF((SELECT '','' + ci.institucion FROM RNDetenciones_FA.dbo.oficiales_fa o INNER JOIN RNDetenciones_FA.dbo.cat_instituciones_fa ci ON ci.id_institucion=o.id_institucion WHERE o.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') END  + '','' +
 			CASE WHEN STUFF((SELECT '','' + institucion FROM RNDetenciones_FA.dbo.oficiales_PSP_fa opsp WHERE opsp.id_detencion=d.id_detencion FOR XML PATH('''')), 1, 1, '''') IS NULL THEN ''''
@@ -370,6 +371,8 @@ BEGIN
      							when dt.fecha_nacimiento is null
                             then ddc.fecha_nacimiento
                         else ddc.fecha_nacimiento end = ' + '''' + @fecha_nacimiento + ''''
+
+				--SET @sSQLWhere = @sSQLWhere + ' or (ddc.fecha_nacimiento is null and dt.fecha_nacimiento is null))'
 
               END
 
